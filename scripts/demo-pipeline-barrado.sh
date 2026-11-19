@@ -4,8 +4,6 @@
 #   ./scripts/demo-pipeline-barrado.sh vazar     -> commita um segredo FICTÍCIO e faz push (pipeline FALHA no Gitleaks)
 #   ./scripts/demo-pipeline-barrado.sh corrigir  -> troca por variável de ambiente, reescreve o commit e faz push (pipeline PASSA)
 #
-# O segredo é gerado na hora (aleatório e sem valor real), então este script não
-# contém nenhum segredo e não dispara o próprio Gitleaks.
 set -euo pipefail
 
 BRANCH="demo/segredo-vazado"
