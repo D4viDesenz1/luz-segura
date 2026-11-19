@@ -1,0 +1,19 @@
+{
+  "fonte": "DADOS SIMULADOS para o MVP - coordenadas aproximadas no entorno do centro de Osasco/SP. Substituir pelo GTFS da EMTU/SP ou da prefeitura de Osasco no pipeline de Big Data (camada Ouro, dim_local). Observação: o SPTrans Olho Vivo cobre a cidade de São Paulo; Osasco é atendida principalmente por linhas intermunicipais (EMTU) e municipais.",
+  "gerado_em": "2026-11-18",
+  "criterio": "Pontos distribuídos em corredores de grande circulação noturna próximos à estação de trem, para testar a regra de prioridade por proximidade de parada.",
+  "paradas": [
+    {"id": "P001", "nome": "Estação Osasco - acesso norte", "lat": -23.5268, "lon": -46.7770, "fluxo_noturno": "alto"},
+    {"id": "P002", "nome": "Estação Osasco - acesso sul", "lat": -23.5285, "lon": -46.7778, "fluxo_noturno": "alto"},
+    {"id": "P003", "nome": "Av. dos Autonomistas - Centro", "lat": -23.5325, "lon": -46.7840, "fluxo_noturno": "alto"},
+    {"id": "P004", "nome": "Av. dos Autonomistas - Vila Yara", "lat": -23.5410, "lon": -46.7720, "fluxo_noturno": "medio"},
+    {"id": "P005", "nome": "R. Antônio Agu - Centro", "lat": -23.5318, "lon": -46.7905, "fluxo_noturno": "alto"},
+    {"id": "P006", "nome": "Av. Maria Campos", "lat": -23.5240, "lon": -46.7930, "fluxo_noturno": "medio"},
+    {"id": "P007", "nome": "Terminal Rodoviário Osasco (aprox.)", "lat": -23.5300, "lon": -46.7810, "fluxo_noturno": "alto"},
+    {"id": "P008", "nome": "Av. Bussocaba", "lat": -23.5460, "lon": -46.7900, "fluxo_noturno": "medio"},
+    {"id": "P009", "nome": "Av. Santo Antônio - Vila Osasco", "lat": -23.5380, "lon": -46.7960, "fluxo_noturno": "baixo"},
+    {"id": "P010", "nome": "Av. Pres. Médici - Jardim Piratininga", "lat": -23.5200, "lon": -46.7850, "fluxo_noturno": "medio"},
+    {"id": "P011", "nome": "Av. Getúlio Vargas - Km 18", "lat": -23.5150, "lon": -46.7740, "fluxo_noturno": "baixo"},
+    {"id": "P012", "nome": "R. da Estação - Presidente Altino (aprox.)", "lat": -23.5345, "lon": -46.7615, "fluxo_noturno": "medio"}
+  ]
+}

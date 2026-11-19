@@ -1,0 +1,65 @@
+# Stack completa local: API + Prometheus + Grafana.
+#   cp .env.example .env   (preencha os tokens)
+#   docker compose up -d --build
+#   API:        http://localhost:8000
+#   Prometheus: http://localhost:9090
+#   Grafana:    http://localhost:3000   (admin / valor de GRAFANA_ADMIN_PASSWORD)
+# Todas as portas ficam presas em 127.0.0.1: nada é exposto para a rede.
+
+services:
+  api:
+    build: .
+    image: luz-segura:local
+    env_file: .env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DB_PATH: /home/data/luzsegura.db
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - dados:/home/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 128
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    depends_on: [api]
+    entrypoint: ["/bin/sh", "/etc/prometheus/entrypoint.sh"]
+    environment:
+      ALVO_SCHEME: http
+      ALVO_HOST: api:8000
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus:/etc/prometheus:ro
+      - ./observability/secrets/metrics_token:/run/secrets/metrics_token:ro
+      - prometheus:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:12.1.0
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina GRAFANA_ADMIN_PASSWORD no .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  dados:
+  prometheus:
+  grafana:

@@ -1,0 +1,40 @@
+:root {
+  --bg: #0f1115;
+  --card: #1a1d24;
+  --texto: #f2f3f5;
+  --sutil: #b9bec9;
+  --destaque: #ffd23f;
+  --perigo: #ff6b6b;
+  --ok: #5ad19a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg); color: var(--texto); line-height: 1.5; font-size: 17px;
+}
+header, main, footer { max-width: 720px; margin: 0 auto; padding: 16px; }
+h1 { color: var(--destaque); margin: 8px 0; font-size: 2rem; }
+h2 { font-size: 1.25rem; margin-top: 0; }
+.card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+label { display: block; font-weight: 600; margin-bottom: 6px; }
+input[type=file] { width: 100%; padding: 10px; background: #0b0d10; color: var(--texto); border: 1px solid #3a3f4b; border-radius: 8px; }
+button {
+  display: block; width: 100%; margin-top: 12px; padding: 14px; font-size: 1rem; font-weight: 700;
+  border: 0; border-radius: 8px; background: var(--destaque); color: #111; cursor: pointer;
+}
+button.secundario { background: transparent; color: var(--destaque); border: 2px solid var(--destaque); }
+button:focus-visible, input:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+button:disabled { opacity: .6; cursor: wait; }
+.dica, .privacidade, footer { color: var(--sutil); font-size: .9rem; }
+#resultado { margin-top: 12px; }
+.msg { padding: 12px; border-radius: 8px; background: #0b0d10; border-left: 4px solid var(--destaque); }
+.msg.erro { border-color: var(--perigo); }
+.msg.ok { border-color: var(--ok); }
+.lista { padding-left: 20px; }
+.lista li { margin-bottom: 12px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .8rem; font-weight: 700; background: #333; }
+.badge.inexistente { background: var(--perigo); color: #111; }
+.badge.fraca { background: var(--destaque); color: #111; }
+.stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.stats div { background: #0b0d10; padding: 8px 12px; border-radius: 8px; }
+details { color: var(--sutil); font-size: .9rem; }

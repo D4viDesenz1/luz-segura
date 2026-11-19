@@ -1,0 +1,6 @@
+# Dependências de produção com versão fixa (reprodutível e auditável pelo Trivy)
+starlette==1.10.0
+uvicorn==0.54.0
+pydantic==2.14.3
+pillow==13.0.0
+python-multipart==0.0.34

@@ -1,0 +1,6 @@
+# Copie para backend.hcl (no .gitignore). Valores impressos por scripts/bootstrap-tfstate.sh
+resource_group_name  = "rg-luzsegura-tfstate"
+storage_account_name = "stluzseguratfXXXXX"
+container_name       = "tfstate"
+key                  = "luz-segura.tfstate"
+use_azuread_auth     = true

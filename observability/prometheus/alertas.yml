@@ -1,0 +1,56 @@
+groups:
+  - name: luz-segura-golden-signals
+    rules:
+      # DISPONIBILIDADE - dispara ao parar o App Service (az webapp stop) por 1 minuto.
+      - alert: LuzSeguraFora
+        expr: up{job="luz-segura"} == 0
+        for: 1m
+        labels:
+          severidade: critica
+        annotations:
+          resumo: "API do Luz Segura fora do ar"
+          descricao: "O Prometheus não consegue coletar {{ $labels.instance }} há mais de 1 minuto."
+
+      # ERROS - mais de 5% de respostas 5xx em 5 minutos.
+      - alert: LuzSeguraTaxaDeErroAlta
+        expr: |
+          sum(rate(http_requests_total{job="luz-segura",status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total{job="luz-segura"}[5m])), 0.001) > 0.05
+        for: 2m
+        labels:
+          severidade: critica
+        annotations:
+          resumo: "Taxa de erro 5xx acima de 5%"
+          descricao: "Taxa atual: {{ $value | humanizePercentage }}."
+
+      # LATÊNCIA - p95 acima de 1 s por 5 minutos.
+      - alert: LuzSeguraLatenciaAlta
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{job="luz-segura"}[5m]))) > 1
+        for: 5m
+        labels:
+          severidade: alerta
+        annotations:
+          resumo: "Latência p95 acima de 1 segundo"
+          descricao: "p95 atual: {{ $value | humanizeDuration }}."
+
+      # SATURAÇÃO - memória do processo acima de 400 MB (plano B1 tem 1,75 GB).
+      - alert: LuzSeguraMemoriaAlta
+        expr: process_resident_memory_bytes{job="luz-segura"} > 400e6
+        for: 5m
+        labels:
+          severidade: alerta
+        annotations:
+          resumo: "Uso de memória alto"
+          descricao: "Memória residente: {{ $value | humanize1024 }}B."
+
+      # NEGÓCIO - fila de manutenção acumulando. Fácil de demonstrar com scripts/popular_demo.py
+      - alert: LuzSeguraFilaDeManutencaoAlta
+        expr: luzsegura_chamados_ativos{job="luz-segura"} > 10
+        for: 1m
+        labels:
+          severidade: alerta
+        annotations:
+          resumo: "Mais de 10 pontos escuros aguardando manutenção"
+          descricao: "{{ $value }} chamados ativos. Acionar a equipe de manutenção."

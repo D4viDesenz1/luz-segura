@@ -1,0 +1,261 @@
+# Pipeline DevSecOps do Luz Segura
+#
+#  todo push/PR, em paralelo:
+#     testes · Gitleaks · Semgrep · terraform validate · build + Trivy
+#                  │ (todos verdes, só na main)
+#                  ▼
+#     push da imagem no GHCR ──► deploy no Azure (OIDC) ──► smoke test
+#
+# Qualquer segredo vazado, vulnerabilidade de código (Semgrep ERROR) ou CVE
+# HIGH/CRITICAL com correção disponível BARRA o deploy.
+
+name: devsecops
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+  GITLEAKS_VERSION: "8.28.0"
+  TRIVY_IMAGE: "aquasec/trivy:0.65.0"
+
+jobs:
+  testes:
+    name: Testes automatizados
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q --junitxml=relatorio-testes.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorio-testes
+          path: relatorio-testes.xml
+
+  gitleaks:
+    name: Gitleaks (segredos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Instalar Gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tgz gitleaks && sudo mv gitleaks /usr/local/bin/ && rm gitleaks.tgz
+          gitleaks version
+      - name: Varredura dos commits enviados
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Escaneia somente os commits novos deste push/PR. Assim, depois que o segredo
+          # é revogado e removido do histórico (amend + force push), o pipeline volta a passar.
+          if [ "$EVENT" = "pull_request" ]; then
+            RANGE="${BASE_SHA}..${GITHUB_SHA}"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+               && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            RANGE="${BEFORE}..${GITHUB_SHA}"
+          else
+            RANGE="${GITHUB_SHA}~1..${GITHUB_SHA}"
+            git cat-file -e "${GITHUB_SHA}~1" 2>/dev/null || RANGE="${GITHUB_SHA}"
+          fi
+          echo "Intervalo analisado: $RANGE"
+          gitleaks git . --config .gitleaks.toml --log-opts="$RANGE" \
+            --redact --verbose --exit-code 1 \
+            --report-format sarif --report-path gitleaks.sarif
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-relatorio
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Análise estática
+        run: |
+          # Bloqueia achados de severidade ERROR; os demais ficam no relatório.
+          semgrep scan \
+            --config p/python --config p/owasp-top-ten --config p/dockerfile \
+            --severity ERROR --error --metrics off \
+            --sarif --output semgrep.sarif
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-relatorio
+          path: semgrep.sarif
+          if-no-files-found: ignore
+
+  iac:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  build_scan:
+    name: Build + Trivy
+    # Roda em paralelo com Gitleaks e Semgrep: build e Trivy executam em TODO push,
+    # mesmo quando outro scanner barra a execução.
+    runs-on: ubuntu-latest
+    outputs:
+      imagem: ${{ steps.meta.outputs.imagem }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nome da imagem (GHCR exige minúsculas)
+        id: meta
+        run: |
+          REPO="${GITHUB_REPOSITORY,,}"
+          echo "IMAGEM_BASE=ghcr.io/${REPO}" >> "$GITHUB_ENV"
+          echo "imagem=ghcr.io/${REPO}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build da imagem
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "${IMAGEM_BASE}:${GITHUB_SHA}" -t "${IMAGEM_BASE}:latest" .
+
+      - name: Trivy - vulnerabilidades da IMAGEM (HIGH/CRITICAL barram)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/" \
+            "$TRIVY_IMAGE" image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed \
+            --scanners vuln,secret --no-progress "${IMAGEM_BASE}:${GITHUB_SHA}"
+
+      - name: Trivy - dependências Python e configurações (Dockerfile, Terraform)
+        run: |
+          docker run --rm -v "$PWD:/src" -v "$HOME/.cache/trivy:/root/.cache/" \
+            "$TRIVY_IMAGE" fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed \
+            --scanners vuln,misconfig,secret --skip-dirs tests --no-progress /src
+
+      - name: Trivy - relatório completo (todas as severidades, não barra)
+        if: always()
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -v "$HOME/.cache/trivy:/root/.cache/" \
+            "$TRIVY_IMAGE" image --exit-code 0 --format table --output /out/trivy-imagem.txt \
+            --no-progress "${IMAGEM_BASE}:${GITHUB_SHA}" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-relatorio
+          path: trivy-imagem.txt
+          if-no-files-found: ignore
+
+      - name: Exportar imagem aprovada (só na main)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: docker save "${IMAGEM_BASE}:${GITHUB_SHA}" "${IMAGEM_BASE}:latest" | gzip > imagem.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: imagem
+          path: imagem.tar.gz
+          retention-days: 1
+
+  publicar:
+    name: Push da imagem (GHCR)
+    # Só publica se TODOS os controles passaram.
+    needs: [testes, gitleaks, semgrep, iac, build_scan]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      imagem: ${{ needs.build_scan.outputs.imagem }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: imagem
+      - name: Carregar e publicar
+        env:
+          IMAGEM: ${{ needs.build_scan.outputs.imagem }}
+        run: |
+          gunzip -c imagem.tar.gz | docker load
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGEM"
+          docker push "${IMAGEM%:*}:latest"
+
+  deploy:
+    name: Deploy no Azure App Service
+    needs: publicar
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: producao
+      url: ${{ steps.url.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write   # OIDC: o GitHub troca um token de curta duração com o Azure, sem senha guardada
+    concurrency:
+      group: deploy-producao
+      cancel-in-progress: false
+    steps:
+      - name: Login no Azure (OIDC, sem segredo de longa duração)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Atualizar a imagem do Web App
+        env:
+          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APP: ${{ secrets.AZURE_WEBAPP_NAME }}
+          IMAGEM: ${{ needs.publicar.outputs.imagem }}
+        run: |
+          az webapp config container set --resource-group "$RG" --name "$APP" \
+            --container-image-name "$IMAGEM" --container-registry-url "https://ghcr.io" --output none
+          az webapp restart --resource-group "$RG" --name "$APP"
+
+      - name: URL pública
+        id: url
+        env:
+          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APP: ${{ secrets.AZURE_WEBAPP_NAME }}
+        run: |
+          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
+          echo "url=https://${HOST}" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (health + página + headers de segurança)
+        env:
+          URL: ${{ steps.url.outputs.url }}
+        run: |
+          curl -fsS --retry 20 --retry-delay 15 --retry-all-errors "$URL/health"
+          curl -fsS -o /dev/null "$URL/"
+          curl -sSI "$URL/health" | grep -qi "x-content-type-options: nosniff"
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$URL/metrics")" = "401"
+          echo "Deploy validado em $URL"

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Dados locais
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Segredos - NUNCA versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Terraform: state e variáveis ficam FORA do repositório (critério da disciplina)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend.hcl
+!backend.hcl.example
+crash.log
+*.tfplan
+infra/terraform/*.txt
+.terraform.lock.hcl.bak
+
+# Demo de pipeline barrado (gerado localmente pelo script)
+demo/
+
+# SO / IDE
+.DS_Store
+.idea/
+.vscode/

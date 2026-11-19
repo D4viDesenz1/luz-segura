@@ -1,0 +1,17 @@
+# Usa todas as regras padrão do Gitleaks e libera apenas:
+#  - arquivos de exemplo e testes (valores fictícios por design)
+#  - referências de código a variáveis (ex.: var.metrics_token), que não são segredos
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores fictícios de teste/templates e referências a variáveis"
+paths = [
+  '''tests/.*''',
+  '''.*\.example$''',
+]
+regexTarget = "secret"
+regexes = [
+  '''^(var|s|self|settings|a)\.[a-z_]+$''',
+  '''^[A-Z_]+\.get$''',
+]

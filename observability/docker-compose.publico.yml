@@ -1,0 +1,41 @@
+# Prometheus + Grafana LOCAIS monitorando o MVP PUBLICADO no Azure.
+# (o enunciado permite: "Prometheus e Grafana podem rodar local apontando para o MVP publicado")
+#
+#   cd observability
+#   echo -n "<METRICS_TOKEN de produção>" > secrets/metrics_token
+#   MVP_HOST=luz-segura-xxxx.azurewebsites.net GRAFANA_ADMIN_PASSWORD=troque docker compose -f docker-compose.publico.yml up -d
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    entrypoint: ["/bin/sh", "/etc/prometheus/entrypoint.sh"]
+    environment:
+      ALVO_SCHEME: https
+      ALVO_HOST: ${MVP_HOST:?defina MVP_HOST, ex. luz-segura-xxxx.azurewebsites.net}
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - ./secrets/metrics_token:/run/secrets/metrics_token:ro
+      - prometheus:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:12.1.0
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  prometheus:
+  grafana:

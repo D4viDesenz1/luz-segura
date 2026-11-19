@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Luz Segura - relate um ponto escuro</title>
+  <meta name="description" content="Relate postes apagados e pontos escuros perto de paradas de ônibus em Osasco.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Luz Segura</h1>
+    <p>Viu um ponto escuro, um poste apagado ou uma parada sem luz? Mande uma foto. A gente prioriza e encaminha para a manutenção.</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="titulo-relato" class="card">
+      <h2 id="titulo-relato">Relatar ponto escuro</h2>
+      <form id="form-relato" novalidate>
+        <label for="foto">Foto do local, de noite e sem flash</label>
+        <input id="foto" name="foto" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+
+        <button type="button" id="btn-local" class="secundario">Usar minha localização</button>
+        <p id="local-status" class="dica" aria-live="polite">Localização ainda não definida.</p>
+        <input type="hidden" id="lat" name="lat">
+        <input type="hidden" id="lon" name="lon">
+
+        <button type="submit" id="btn-enviar">Enviar relato</button>
+      </form>
+      <div id="resultado" aria-live="polite"></div>
+      <p class="privacidade">Privacidade: a foto é analisada e descartada na hora. Não guardamos a imagem, o seu nome nem o seu telefone. A localização fica registrada com precisão de cerca de 11 metros.</p>
+    </section>
+
+    <section aria-labelledby="titulo-fila" class="card">
+      <h2 id="titulo-fila">Fila de manutenção por prioridade</h2>
+      <div id="stats" class="stats"></div>
+      <ol id="lista-chamados" class="lista"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Piloto acadêmico (FIAP Global Solution 2026.2, CitizenTech). ODS 11: cidades e comunidades sustentáveis.</p>
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
